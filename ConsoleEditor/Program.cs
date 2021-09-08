@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Xml;
@@ -45,41 +46,67 @@ namespace ConsoleEditor
         }
     }
 
+    public enum EditorMode
+    {
+        Command,
+        Input
+    } 
     public class Editor
     {
         public Editor()
         {
             Console.Clear();
+            Actions = new List<Func<Editor, bool>>();
+            Actions.AddRange(BaseLibrary.InputCharacters);
+            Actions.AddRange(BaseLibrary.ArrowActions);
         }
-        public List<string> Text { get; set; } = new List<string>();
+
+        public List<ImmutableList<string>> TextHistory = new List<ImmutableList<string>>();
+        public ImmutableList<string> Text { get; set; } = ImmutableList<string>.Empty;
+        public int LeftPos { get; set; } = 0;
+        public int TopPos { get; set; } = 0;
+        public List<Func<Editor, bool>> Actions = new List<Func<Editor, bool>>();
+        public ConsoleKeyInfo? LastKey = null;
+        public string CommandText = "";
+        public EditorMode Mode = EditorMode.Input;
         public void RunCustomConsole()
         {
-            var (leftPos, topPos) = Console.GetCursorPosition();
+            (LeftPos, TopPos) = Console.GetCursorPosition();
             while (true)
             {
-                var key= Console.ReadKey(true);
-                
+                LastKey = Console.ReadKey(true)!;
 
-                Console.SetCursorPosition(leftPos, topPos);
-                if (key.Key == ConsoleKey.Enter)
+                for (int i = Actions.Count - 1; i >= 0; i--)
+                {
+                    var action = Actions[i];
+                    var ran = action.Invoke(this);
+                    if (ran)
+                    {
+                        break;
+                    }
+                }
+
+                Console.SetCursorPosition(LeftPos, TopPos);
+                 
+                if (LastKey.Value.Key == ConsoleKey.Enter)
                 {
                     Console.SetCursorPosition(0, Console.GetCursorPosition().Top+1);
-                    leftPos = 0;
-                    topPos++;
+                    LeftPos = 0;
+                    TopPos++;
                 }
-                else if (key.Key == ConsoleKey.Escape)
-                {
-                    Console.Write("[esc]");
-                    leftPos+=5;
-                }
-                else
-                {
-                    Console.Write(key.KeyChar);
-                    leftPos++;
-                }
+                // else if (LastKey.Value.Key == ConsoleKey.Escape)
+                // {
+                //     Console.Write("[esc]");
+                //     LeftPos+=5;
+                // }
+                // else
+                // {
+                //     Console.Write(LastKey.Value.KeyChar);
+                //     LeftPos++;
+                // }
                 
                 
-                WriteStatusBar(key);
+                WriteStatusBar(LastKey.Value);
                 
             }
         }
@@ -96,13 +123,66 @@ namespace ConsoleEditor
 
         public void LoadFile(IEnumerable<string> readLines)
         {
-            this.Text = readLines.ToList();
+            if (Text.Any())
+            {
+                TextHistory.Add(this.Text);
+            } 
+            Text = readLines.ToImmutableList();
+            
 
             for (var i = 0; i < this.Text.Count && i < Console.WindowHeight - 1; i++)
             {
                  Console.SetCursorPosition(0, i);
                  Console.WriteLine(this.Text[i]);
             }
+            Console.SetCursorPosition(0,0);
         }
     }
+
+    public static class BaseLibrary
+    {
+        public static List<Func<Editor, bool>> ArrowActions = new List<Func<Editor, bool>>()
+        {
+            editor =>
+            {
+                if (editor.LastKey?.Key != ConsoleKey.DownArrow) return false;
+                editor.TopPos = editor.TopPos + 1;
+                return true;
+            },
+            editor =>
+            {
+                if (editor.LastKey?.Key != ConsoleKey.UpArrow) return false;
+                editor.TopPos = Math.Max(0, editor.TopPos - 1);
+                return true;
+            },
+            editor =>
+            {
+                if (editor.LastKey?.Key != ConsoleKey.RightArrow) return false;
+                editor.LeftPos += 1;
+                return true;
+            },
+            editor =>
+            {
+                if (editor.LastKey?.Key != ConsoleKey.LeftArrow) return false;
+                editor.LeftPos = Math.Max(0, editor.LeftPos - 1);
+                return true;
+            }
+        };
+        
+        
+        public static List<Func<Editor, bool>> InputCharacters = new List<Func<Editor, bool>>()
+        {
+            editor =>
+            {
+                if (editor.LastKey?.Key == null || editor.Mode != EditorMode.Input) return false;
+                Console.Write(editor.LastKey.Value.KeyChar);
+                editor.LeftPos += 1;
+
+                return true;
+            }
+        };
+        
+        
+    }
+     
 }
