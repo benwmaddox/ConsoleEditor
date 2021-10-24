@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Xml;
 using Terminal.Gui;
 
@@ -16,6 +17,7 @@ namespace ConsoleEditor
             var editor = new Editor();
             editor.LoadFile(File.ReadLines("Sample.html"));
             editor.RunCustomConsole();
+            
         }
         
         
@@ -85,6 +87,15 @@ namespace ConsoleEditor
                         break;
                     }
                 }
+                using (var stdOut = Console.OpenStandardOutput())
+                {
+                    var outputString = string.Join("", this.Text.Select(x => x.PadRight(Console.BufferWidth)));
+                    var outputBytes = Encoding.UTF8.GetBytes(outputString);
+                    Console.SetCursorPosition(0,0);
+                    stdOut.Write(outputBytes, 0, outputBytes.Length);
+                        
+                }
+
 
                 Console.SetCursorPosition(LeftPos, TopPos);
                  
@@ -175,8 +186,29 @@ namespace ConsoleEditor
             editor =>
             {
                 if (editor.LastKey?.Key == null || editor.Mode != EditorMode.Input) return false;
-                Console.Write(editor.LastKey.Value.KeyChar);
+                // Console.Write(editor.LastKey.Value.KeyChar);
+
+                editor.TextHistory.Add(editor.Text);
+                var newLine = editor.Text[editor.TopPos].PadRight(Console.WindowWidth).Insert(editor.LeftPos, editor.LastKey.Value.KeyChar.ToString());
+                editor.Text = editor.Text.RemoveAt(editor.TopPos);
+                editor.Text = editor.Text.Insert(editor.TopPos, newLine);
+                
+                // Console.SetCursorPosition(0, editor.TopPos);
+                // Console.WriteLine(editor.Text[editor.TopPos]);
+                
                 editor.LeftPos += 1;
+                // Console.SetCursorPosition(editor.LeftPos, editor.TopPos);
+                Console.OutputEncoding = Encoding.UTF8;
+                //
+                // using (var stdOut = Console.OpenStandardOutput())
+                // {
+                //     var outputString = string.Join("", editor.Text.Select(x => x.PadRight(Console.BufferWidth)));
+                //     var outputBytes = Encoding.UTF8.GetBytes(outputString);
+                //     stdOut.Write(outputBytes, 0, outputBytes.Length);
+                //         
+                // }
+                //
+                
 
                 return true;
             }
