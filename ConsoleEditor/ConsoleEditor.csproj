@@ -7,13 +7,13 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Terminal.Gui" Version="1.2.1" />
+        <PackageReference Include="Terminal.Gui" Version="1.2.1"/>
     </ItemGroup>
 
     <ItemGroup>
-      <None Update="Sample.html">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
+        <None Update="Sample.html">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
     </ItemGroup>
 
 </Project>

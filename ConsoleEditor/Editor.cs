@@ -1,19 +1,26 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Text;
 using System.Linq;
+using System.Text;
 
 namespace ConsoleEditor
 {
-    
     public enum EditorMode
     {
         Command,
         Input
-    } 
+    }
+
     public class Editor
     {
+        public List<Func<Editor, bool>> Actions = new();
+        public string CommandText = "";
+        public ConsoleKeyInfo? LastKey;
+        public EditorMode Mode = EditorMode.Input;
+
+        public List<ImmutableList<string>> TextHistory = new();
+
         public Editor()
         {
             Console.Clear();
@@ -22,14 +29,10 @@ namespace ConsoleEditor
             Actions.AddRange(BaseLibrary.ArrowActions);
         }
 
-        public List<ImmutableList<string>> TextHistory = new List<ImmutableList<string>>();
         public ImmutableList<string> Text { get; set; } = ImmutableList<string>.Empty;
-        public int LeftPos { get; set; } = 0;
-        public int TopPos { get; set; } = 0;
-        public List<Func<Editor, bool>> Actions = new List<Func<Editor, bool>>();
-        public ConsoleKeyInfo? LastKey = null;
-        public string CommandText = "";
-        public EditorMode Mode = EditorMode.Input;
+        public int LeftPos { get; set; }
+        public int TopPos { get; set; }
+
         public void RunCustomConsole()
         {
             (LeftPos, TopPos) = Console.GetCursorPosition();
@@ -37,30 +40,27 @@ namespace ConsoleEditor
             {
                 LastKey = Console.ReadKey(true)!;
 
-                for (int i = Actions.Count - 1; i >= 0; i--)
+                for (var i = Actions.Count - 1; i >= 0; i--)
                 {
                     var action = Actions[i];
                     var ran = action.Invoke(this);
-                    if (ran)
-                    {
-                        break;
-                    }
+                    if (ran) break;
                 }
+
                 using (var stdOut = Console.OpenStandardOutput())
                 {
-                    var outputString = string.Join("", this.Text.Select(x => x.PadRight(Console.BufferWidth)));
+                    var outputString = string.Join("", Text.Select(x => x.PadRight(Console.BufferWidth)));
                     var outputBytes = Encoding.UTF8.GetBytes(outputString);
-                    Console.SetCursorPosition(0,0);
+                    Console.SetCursorPosition(0, 0);
                     stdOut.Write(outputBytes, 0, outputBytes.Length);
-                        
                 }
 
 
                 Console.SetCursorPosition(LeftPos, TopPos);
-                 
+
                 if (LastKey.Value.Key == ConsoleKey.Enter)
                 {
-                    Console.SetCursorPosition(0, Console.GetCursorPosition().Top+1);
+                    Console.SetCursorPosition(0, Console.GetCursorPosition().Top + 1);
                     LeftPos = 0;
                     TopPos++;
                 }
@@ -74,10 +74,9 @@ namespace ConsoleEditor
                 //     Console.Write(LastKey.Value.KeyChar);
                 //     LeftPos++;
                 // }
-                
-                
+
+
                 WriteStatusBar(LastKey.Value);
-                
             }
         }
 
@@ -85,32 +84,30 @@ namespace ConsoleEditor
         {
             var currentPos = Console.GetCursorPosition();
             var status = $"Key: {consoleKeyInfo.Key.ToString().PadRight(10)} Pos: {currentPos} ";
-            Console.SetCursorPosition(0, Console.WindowHeight-1);
-            
+            Console.SetCursorPosition(0, Console.WindowHeight - 1);
+
             Console.Write(status.PadRight(Console.WindowWidth));
             Console.SetCursorPosition(currentPos.Left, currentPos.Top);
         }
 
         public void LoadFile(IEnumerable<string> readLines)
         {
-            if (Text.Any())
-            {
-                TextHistory.Add(this.Text);
-            } 
+            if (Text.Any()) TextHistory.Add(Text);
             Text = readLines.ToImmutableList();
-            
-            for (var i = 0; i < this.Text.Count && i < Console.WindowHeight - 1; i++)
+
+            for (var i = 0; i < Text.Count && i < Console.WindowHeight - 1; i++)
             {
-                 Console.SetCursorPosition(0, i);
-                 Console.WriteLine(this.Text[i]);
+                Console.SetCursorPosition(0, i);
+                Console.WriteLine(Text[i]);
             }
-            Console.SetCursorPosition(0,0);
+
+            Console.SetCursorPosition(0, 0);
         }
     }
 
     public static class BaseLibrary
     {
-        public static List<Func<Editor, bool>> ArrowActions = new List<Func<Editor, bool>>()
+        public static List<Func<Editor, bool>> ArrowActions = new()
         {
             editor =>
             {
@@ -139,7 +136,7 @@ namespace ConsoleEditor
         };
 
 
-        public static List<Func<Editor, bool>> InputCharacters = new List<Func<Editor, bool>>()
+        public static List<Func<Editor, bool>> InputCharacters = new()
         {
             editor =>
             {
