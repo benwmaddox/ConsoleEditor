@@ -4,6 +4,52 @@ using System.Linq;
 
 namespace ConsoleEditor
 {
+
+
+
+    public class Pane
+    {
+        // positioning and size
+        public int X { get; set; }
+        public int Y { get; set; }
+        public int Width { get; set; }
+        public int Height { get; set; }
+        public AttachPosition AttachPosition { get; set; }
+        public List<object> Children { get; set; } // Pane, document, etc. Rendered IN ORDER 
+        
+    }
+
+    public enum AttachPosition
+    {
+        Top,
+        Bottom,
+        Left,
+        Right
+    }
+
+    public class SelectList
+    {
+        
+    }
+
+    public class StatusBar
+    {
+        
+    }
+
+    public class CommandBar
+    {
+        
+    }
+    
+    
+    
+    
+    
+    
+    
+    
+    
     public enum EditorMode
     {
         Command,
@@ -130,11 +176,16 @@ namespace ConsoleEditor
 
     }
 
-    public class Editor
+    public static class Editor
     {
-        private readonly Document document = new();
+        public static List<Pane> Panes = new();
+        public static Pane ActivePane { get; set; }
+        
+        
+        // Active document?
+        public static Document document = new();
 
-        public Dictionary<(ConsoleKey, ConsoleModifiers), Action<Document>> KeyboardMapping = new()
+        public static Dictionary<(ConsoleKey, ConsoleModifiers), Action<Document>> KeyboardMapping = new()
         {
             { (ConsoleKey.DownArrow, 0x0), EditorCommands.MoveDown },
             { (ConsoleKey.RightArrow, 0x0), EditorCommands.MoveRight },
@@ -160,12 +211,12 @@ namespace ConsoleEditor
 
         };
 
-        public Editor()
+        static Editor()
         {
             Console.Clear();
         }
 
-        public void Run()
+        public static void Run()
         {
             var r = Console.ReadKey();
             while (true)
@@ -182,12 +233,12 @@ namespace ConsoleEditor
             }
         }
 
-        public void Apply(Action<Document> action)
+        public static void Apply(Action<Document> action)
         {
             action.Invoke(document);
         }
 
-        public void InsertCharacter(char character)
+        public static void InsertCharacter(char character)
         {
             var line = document.Text[document.VirtualTop];
             document.Text[document.VirtualTop] =
@@ -195,7 +246,7 @@ namespace ConsoleEditor
             Apply(EditorCommands.MoveRight);
         }
 
-        public void LoadFile(IEnumerable<string> readLines)
+        public static void LoadFile(IEnumerable<string> readLines)
         {
             document.Text = readLines.ToList();
             // if (Text.Any())
@@ -207,7 +258,7 @@ namespace ConsoleEditor
             Console.SetCursorPosition(0, 0);
         }
 
-        public void RenderText()
+        public static void RenderText()
         {
             for (var i = 0; i < document.Text.Count && i < Console.WindowHeight - 1; i++)
             {

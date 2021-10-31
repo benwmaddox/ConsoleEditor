@@ -8,9 +8,9 @@ namespace ConsoleEditor
         private static void Main(string[] args)
         {
             // RunGuiCS();
-            var editor = new Editor();
-            editor.LoadFile(File.ReadLines("Sample.html"));
-            editor.Run();
+            // var editor = new Editor();
+            Editor.LoadFile(File.ReadLines("Sample.html"));
+            Editor.Run();
             // editor.RunCustomConsole();
         }
 
