@@ -71,10 +71,67 @@ namespace ConsoleEditor
             var word = line.Substring(0, doc.VirtualLeft);
             var previousWord = word.Split(' ').LastOrDefault();
             if (previousWord != null) doc.VirtualLeft -= previousWord.Length;
+
         };
 
-        // select console text
         public static Action<Document> SelectAll = doc => { };
+
+        public static Action<Document> Backspace = doc =>
+        {
+            if (doc.VirtualLeft > 0)
+            {
+                var line = doc.Text[doc.VirtualTop];
+                doc.Text[doc.VirtualTop] = line.Substring(0, doc.VirtualLeft - 1) + line.Substring(doc.VirtualLeft);
+                doc.VirtualLeft--;
+            }
+            else if (doc.VirtualTop > 0)
+            {
+                var line = doc.Text[doc.VirtualTop];
+                doc.VirtualLeft = doc.Text[doc.VirtualTop - 1].Length;
+                doc.Text[doc.VirtualTop - 1] += line;
+                doc.VirtualTop--;
+                doc.Text.RemoveAt(doc.VirtualTop + 1);
+            }
+        };
+
+        public static Action<Document> Delete = doc =>
+        {
+            if (doc.VirtualLeft < doc.Text[doc.VirtualTop].Length)
+            {
+                var line = doc.Text[doc.VirtualTop];
+                doc.Text[doc.VirtualTop] = line.Substring(0, doc.VirtualLeft) + line.Substring(doc.VirtualLeft + 1);
+            }
+            else if (doc.VirtualTop < doc.Text.Count() - 1)
+            {
+                var line = doc.Text[doc.VirtualTop];
+                doc.Text[doc.VirtualTop] = line.Substring(doc.VirtualLeft);
+                doc.VirtualTop++;
+                doc.VirtualLeft = 0;
+            }
+        };
+
+        public static Action<Document> NewLine = doc =>
+        {
+            var line = doc.Text[doc.VirtualTop];
+            doc.Text[doc.VirtualTop] = line.Substring(0, doc.VirtualLeft);
+            doc.Text.Insert(doc.VirtualTop + 1, line.Substring(doc.VirtualLeft));
+            doc.VirtualTop++;
+            doc.VirtualLeft = 0;
+        };
+
+        public static Action<Document> Undo = doc => { };
+        public static Action<Document> Redo = doc => { };
+
+        public static Action<Document> Cut = doc => { };
+        public static Action<Document> Copy = doc => { };
+        public static Action<Document> Paste = doc => { };
+
+
+
+
+
+
+
 
 
         //public static Action<
@@ -96,17 +153,18 @@ namespace ConsoleEditor
             { (ConsoleKey.End, 0x0), EditorV2Commands.MoveToLineEnd },
             { (ConsoleKey.Home, ConsoleModifiers.Control), EditorV2Commands.MoveToStart },
             { (ConsoleKey.End, ConsoleModifiers.Control), EditorV2Commands.MoveToEnd },
-            // { (ConsoleKey.Delete, 0x0), EditorV2Commands.Delete},
-            // { (ConsoleKey.Backspace, 0x0), EditorV2Commands.Backspace},
-            // { (ConsoleKey.Enter, 0x0), EditorV2Commands.NewLine},
+            { (ConsoleKey.Delete, 0x0), EditorV2Commands.Delete },
+            { (ConsoleKey.Backspace, 0x0), EditorV2Commands.Backspace },
+            { (ConsoleKey.Enter, 0x0), EditorV2Commands.NewLine },
             // { (ConsoleKey.Tab, 0x0), EditorV2Commands.Tab},
             // { (ConsoleKey.Tab, ConsoleModifiers.Shift), EditorV2Commands.Untab},
-            { (ConsoleKey.A, ConsoleModifiers.Control), EditorV2Commands.SelectAll }
-            // { (ConsoleKey.C, ConsoleModifiers.Control), EditorV2Commands.Copy},
-            // { (ConsoleKey.V, ConsoleModifiers.Control), EditorV2Commands.Paste},
-            // { (ConsoleKey.X, ConsoleModifiers.Control), EditorV2Commands.Cut},
-            // { (ConsoleKey.Z, ConsoleModifiers.Control), EditorV2Commands.Undo},
-            // { (ConsoleKey.Y, ConsoleModifiers.Control), EditorV2Commands.Redo},
+            { (ConsoleKey.A, ConsoleModifiers.Control), EditorV2Commands.SelectAll },
+            { (ConsoleKey.C, ConsoleModifiers.Control), EditorV2Commands.Copy },
+            { (ConsoleKey.V, ConsoleModifiers.Control), EditorV2Commands.Paste },
+            { (ConsoleKey.X, ConsoleModifiers.Control), EditorV2Commands.Cut },
+            { (ConsoleKey.Z, ConsoleModifiers.Control), EditorV2Commands.Undo },
+            { (ConsoleKey.Y, ConsoleModifiers.Control), EditorV2Commands.Redo },
+
         };
 
         public EditorV2()
@@ -162,7 +220,7 @@ namespace ConsoleEditor
             for (var i = 0; i < document.Text.Count && i < Console.WindowHeight - 1; i++)
             {
                 Console.SetCursorPosition(0, i);
-                Console.WriteLine(document.Text[i]);
+                Console.WriteLine(document.Text[i].PadRight(Console.WindowWidth - 1));
             }
         }
     }
