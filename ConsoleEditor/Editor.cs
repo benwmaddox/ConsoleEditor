@@ -7,18 +7,33 @@ namespace ConsoleEditor
 
 
 
-    public class Pane
+    public abstract class Pane
     {
         // positioning and size
         public int X { get; set; }
         public int Y { get; set; }
         public int Width { get; set; }
-        public int Height { get; set; }
+        public int Height { get; set; } 
         public AttachPosition AttachPosition { get; set; }
-        public List<object> Children { get; set; } // Pane, document, etc. Rendered IN ORDER 
-        
     }
 
+    public interface IPaneElement
+    {
+        
+    }
+    public class ElementPane<T> : Pane where T : IPaneElement  
+    {
+        public ElementPane(T element)
+        {
+            Element = element;
+        }
+        public T Element { get; set; }
+    }
+
+    public class ContainerPane : Pane
+    {
+        public List<Pane> Panes { get; set; } = new List<Pane>();
+    }
     public enum AttachPosition
     {
         Top,
@@ -27,7 +42,7 @@ namespace ConsoleEditor
         Right
     }
 
-    public class SelectList
+    public class SelectList : IPaneElement
     {
         
     }
@@ -180,11 +195,6 @@ namespace ConsoleEditor
     {
         public static List<Pane> Panes = new();
         public static Pane ActivePane { get; set; }
-        
-        
-        // Active document?
-        public static Document document = new();
-
         public static Dictionary<(ConsoleKey, ConsoleModifiers), Action<Document>> KeyboardMapping = new()
         {
             { (ConsoleKey.DownArrow, 0x0), EditorCommands.MoveDown },
@@ -208,6 +218,7 @@ namespace ConsoleEditor
             { (ConsoleKey.X, ConsoleModifiers.Control), EditorCommands.Cut },
             { (ConsoleKey.Z, ConsoleModifiers.Control), EditorCommands.Undo },
             { (ConsoleKey.Y, ConsoleModifiers.Control), EditorCommands.Redo },
+            // { (ConsoleKey.Spacebar, ConsoleModifiers.Control), EditorCommands.OpenCommand }
 
         };
 
@@ -218,202 +229,141 @@ namespace ConsoleEditor
 
         public static void Run()
         {
+            RenderPanes();
+            
             var r = Console.ReadKey();
             while (true)
             {
                 var keyMap = (r.Key, r.Modifiers);
-                if (KeyboardMapping.ContainsKey(keyMap))
-                    KeyboardMapping[keyMap].Invoke(document);
-                else
-                    InsertCharacter(r.KeyChar);
 
-                RenderText();
-                Console.SetCursorPosition(document.VirtualLeft, document.VirtualTop);
+                
+                LayoutPanes();
+                
+                if (ActivePane is ElementPane<Document> docPane)
+                {
+                    if (KeyboardMapping.ContainsKey(keyMap))
+                        KeyboardMapping[keyMap].Invoke(docPane.Element);
+                    else
+                        InsertCharacter(r.KeyChar, docPane.Element);
+                    
+                    Console.SetCursorPosition(docPane.Element.VirtualLeft + docPane.X, docPane.Element.VirtualTop + docPane.Y);
+                }
+                else
+                {
+                    // TODO more types
+                }
+
+                RenderPanes();
+
                 r = Console.ReadKey();
+                
             }
         }
 
-        public static void Apply(Action<Document> action)
+        public static void Apply(Action<Document> action, Document doc)
         {
-            action.Invoke(document);
+            action.Invoke(doc);
         }
 
-        public static void InsertCharacter(char character)
+        public static void InsertCharacter(char character, Document doc)
         {
-            var line = document.Text[document.VirtualTop];
-            document.Text[document.VirtualTop] =
-                line.Insert(Math.Min(document.VirtualLeft, line.Length), character.ToString());
-            Apply(EditorCommands.MoveRight);
+            var line = doc.Text[doc.VirtualTop];
+            doc.Text[doc.VirtualTop] =
+                line.Insert(Math.Min(doc.VirtualLeft, line.Length), character.ToString());
+            Apply(EditorCommands.MoveRight, doc);
         }
 
         public static void LoadFile(IEnumerable<string> readLines)
         {
-            document.Text = readLines.ToList();
+            
+            // document.Text = readLines.ToList();
+            ActivePane = new ElementPane<Document>(new Document(readLines));
+            Panes.Add(ActivePane);
             // if (Text.Any())
             // {
             //     TextHistory.Add(this.Text);
             // } 
             // Text = readLines.ToImmutableList();
-            RenderText();
-            Console.SetCursorPosition(0, 0);
+            LayoutPanes();
+            // RenderText(((ActivePane as ElementPane<Document>)!).Element);
+            // Console.SetCursorPosition(0, 0);
         }
 
-        public static void RenderText()
+        private static void LayoutPanes()
         {
-            for (var i = 0; i < document.Text.Count && i < Console.WindowHeight - 1; i++)
+            var maxWidth = Console.WindowWidth;
+            var maxHeight = Console.WindowHeight-2;
+            var paneWidth = maxWidth / Panes.Count;
+            var paneHeight = maxHeight;
+            var paneIndex = 0;
+            foreach (var pane in Panes)
+            {
+                pane.X = paneIndex * paneWidth;
+                pane.Y = 0;
+                pane.Width = paneWidth;
+                pane.Height = paneHeight;
+                paneIndex++;
+            }
+        }
+
+        public static void RenderPanes()
+        {
+            Console.Clear();
+            foreach (var pane in Panes)
+            {
+                if (pane is ElementPane<Document> docPane)
+                {
+                    RenderText(docPane);
+                }
+            }
+            
+            if (ActivePane is ElementPane<Document> ap)
+            {
+                Console.SetCursorPosition(ap.X + ap.Element.VirtualLeft, ap.Y + ap.Element.VirtualTop);
+            } 
+        }
+        public static void RenderText(ElementPane<Document> docPane)
+        {
+            for (var i = 0; i < docPane.Height; i++)
+            {
+                Console.SetCursorPosition(docPane.X, i);
+                if (i < docPane.Element.Text.Count)
+                { 
+                    Console.WriteLine(docPane.Element.Text[i].PadRight(docPane.Width));
+                }
+                else 
+                {
+                    Console.WriteLine("~" + string.Join("", Enumerable.Repeat(" ", docPane.Width - 1)));
+                }
+            } 
+        }
+        public static void RenderText(Document doc)
+        {
+            for (var i = 0; i < Console.WindowHeight - 1; i++)
             {
                 Console.SetCursorPosition(0, i);
-                Console.WriteLine(document.Text[i].PadRight(Console.WindowWidth - 1));
+                if (i < doc.Text.Count)
+                {
+                    Console.WriteLine(doc.Text[i].PadRight(Console.WindowWidth - 1));
+                }
+                else
+                {
+                    Console.WriteLine("~" + string.Join("", Enumerable.Repeat(" ", Console.WindowWidth - 2)));
+                }
             }
         }
     }
 
-    public class Document
+    public class Document : IPaneElement
     {
         public List<string> Text { get; set; } = new();
         public int VirtualLeft { get; set; }
         public int VirtualTop { get; set; }
 
-        // public List<ImmutableList<string>> TextHistory = new List<ImmutableList<string>>();
-        // public ImmutableList<string> Text { get; set; } = ImmutableList<string>.Empty;
-        // public int LeftPos { get; set; } = 0;
-        // public int TopPos { get; set; } = 0;
-        // public List<Func<Editor, bool>> Actions = new List<Func<Editor, bool>>();
-        // public ConsoleKeyInfo? LastKey = null;
-        // public string CommandText = "";
-        // public EditorMode Mode = EditorMode.Input;
-        // public void RunCustomConsole()
-        // {
-        //     (LeftPos, TopPos) = Console.GetCursorPosition();
-        //     while (true)
-        //     {
-        //         LastKey = Console.ReadKey(true)!;
-        //
-        //         for (int i = Actions.Count - 1; i >= 0; i--)
-        //         {
-        //             var action = Actions[i];
-        //             var ran = action.Invoke(this);
-        //             if (ran)
-        //             {
-        //                 break;
-        //             }
-        //         }
-        //         using (var stdOut = Console.OpenStandardOutput())
-        //         {
-        //             var outputString = string.Join("", this.Text.Select(x => x.PadRight(Console.BufferWidth)));
-        //             var outputBytes = Encoding.UTF8.GetBytes(outputString);
-        //             Console.SetCursorPosition(0,0);
-        //             stdOut.Write(outputBytes, 0, outputBytes.Length);
-        //                 
-        //         }
-        //
-        //
-        //         Console.SetCursorPosition(LeftPos, TopPos);
-        //          
-        //         if (LastKey.Value.Key == ConsoleKey.Enter)
-        //         {
-        //             Console.SetCursorPosition(0, Console.GetCursorPosition().Top+1);
-        //             LeftPos = 0;
-        //             TopPos++;
-        //         }
-        //         // else if (LastKey.Value.Key == ConsoleKey.Escape)
-        //         // {
-        //         //     Console.Write("[esc]");
-        //         //     LeftPos+=5;
-        //         // }
-        //         // else
-        //         // {
-        //         //     Console.Write(LastKey.Value.KeyChar);
-        //         //     LeftPos++;
-        //         // }
-        //         
-        //         
-        //         WriteStatusBar(LastKey.Value);
-        //         
-        //     }
-        // }
-
-        // private static void WriteStatusBar(ConsoleKeyInfo consoleKeyInfo)
-        // {
-        //     var currentPos = Console.GetCursorPosition();
-        //     var status = $"Key: {consoleKeyInfo.Key.ToString().PadRight(10)} Pos: {currentPos} ";
-        //     Console.SetCursorPosition(0, Console.WindowHeight-1);
-        //     
-        //     Console.Write(status.PadRight(Console.WindowWidth));
-        //     Console.SetCursorPosition(currentPos.Left, currentPos.Top);
-        // }
+        public Document(IEnumerable<string> text)
+        {
+            Text = text.ToList();
+        }
     }
 
-    // public static class BaseLibrary
-    // {
-    //     public static List<Func<Editor, bool>> ArrowActions = new List<Func<Editor, bool>>()
-    //     {
-    //         editor =>
-    //         {
-    //             if (editor.LastKey?.Key != ConsoleKey.DownArrow) return false;
-    //             editor.TopPos = editor.TopPos + 1;
-    //             return true;
-    //         },
-    //         editor =>
-    //         {
-    //             if (editor.LastKey?.Key != ConsoleKey.UpArrow) return false;
-    //             editor.TopPos = Math.Max(0, editor.TopPos - 1);
-    //             return true;
-    //         },
-    //         editor =>
-    //         {
-    //             if (editor.LastKey?.Key != ConsoleKey.RightArrow) return false;
-    //             editor.LeftPos += 1;
-    //             return true;
-    //         },
-    //         editor =>
-    //         {
-    //             if (editor.LastKey?.Key != ConsoleKey.LeftArrow) return false;
-    //             editor.LeftPos = Math.Max(0, editor.LeftPos - 1);
-    //             return true;
-    //         }
-    //     };
-    //
-    //
-    //     public static List<Func<Editor, bool>> InputCharacters = new List<Func<Editor, bool>>()
-    //     {
-    //         editor =>
-    //         {
-    //             if (editor.LastKey?.Key == null || editor.Mode != EditorMode.Input) return false;
-    //             // Console.Write(editor.LastKey.Value.KeyChar);
-    //
-    //             editor.TextHistory.Add(editor.Text);
-    //             // if (!editor.Text.Contains(editor.TopPos))
-    //             // {
-    //             //     // editor.Text[editor.TopPos] = "";
-    //             // }
-    //
-    //
-    //             var newLine = editor.Text[editor.TopPos]
-    //                 // .PadRight(Console.WindowWidth)
-    //                 .Insert(editor.LeftPos, editor.LastKey.Value.KeyChar.ToString());
-    //             editor.Text = editor.Text.RemoveAt(editor.TopPos);
-    //             editor.Text = editor.Text.Insert(editor.TopPos, newLine);
-    //
-    //             // Console.SetCursorPosition(0, editor.TopPos);
-    //             // Console.WriteLine(editor.Text[editor.TopPos]);
-    //
-    //             editor.LeftPos += 1;
-    //             Console.SetCursorPosition(editor.LeftPos, editor.TopPos);
-    //             Console.OutputEncoding = Encoding.UTF8;
-    //             //
-    //             // using (var stdOut = Console.OpenStandardOutput())
-    //             // {
-    //             //     var outputString = string.Join("", editor.Text.Select(x => x.PadRight(Console.BufferWidth)));
-    //             //     var outputBytes = Encoding.UTF8.GetBytes(outputString);
-    //             //     stdOut.Write(outputBytes, 0, outputBytes.Length);
-    //             //         
-    //             // }
-    //             //
-    //
-    //
-    //             return true;
-    //         }
-    //     };
-    // }
 }
