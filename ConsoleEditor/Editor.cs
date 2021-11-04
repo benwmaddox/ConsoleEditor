@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace ConsoleEditor
 {
@@ -335,8 +336,14 @@ namespace ConsoleEditor
                 {
                     Console.WriteLine("~" + string.Join("", Enumerable.Repeat(" ", docPane.Width - 1)));
                 }
-            } 
+            }
+
+            var outputBuffer = new StringBuilder();
+            var a = "";
+            // a.in
         }
+        
+        
         public static void RenderText(Document doc)
         {
             for (var i = 0; i < Console.WindowHeight - 1; i++)
